@@ -1,0 +1,35 @@
+{
+  "name": "servestacean",
+  "version": "1.0.0",
+  "description": "🦞 Lightweight Docker deployment manager",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "tsc -p tsconfig.renderer.json && node esbuild.renderer.mjs",
+    "build": "npm run build:main && npm run build:renderer",
+    "dev": "npm run build && electron . --no-sandbox",
+    "start": "electron . --no-sandbox"
+  },
+  "keywords": ["docker", "deploy", "electron"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.5.10",
+    "electron": "^28.2.0",
+    "esbuild": "^0.19.12",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.2",
+    "express": "^4.18.2",
+    "react": "^18.2.0",
+    "react-bootstrap": "^2.10.0",
+    "react-dom": "^18.2.0",
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0"
+  }
+}
