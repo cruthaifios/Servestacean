@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, TextField, Grid, CircularProgress,
+} from '@mui/material';
 import { Project } from '../types';
 import { createProject, updateProject } from '../api';
+import { BrowseField } from './BrowseField';
 
 interface Props {
   project: Project | null;
@@ -21,6 +26,30 @@ const defaultValues = {
   remotePath: '~/app',
   preBuildScript: '',
 };
+
+type FieldDef = {
+  key: string;
+  label: string;
+  placeholder: string;
+  required?: boolean;
+  fullWidth?: boolean;
+  browse?: 'file' | 'directory';
+};
+
+const fields: FieldDef[] = [
+  { key: 'name', label: 'Project Name', placeholder: 'My App', required: true, fullWidth: true },
+  { key: 'localRoot', label: 'Local Project Root', placeholder: '/home/user/myproject', required: true, fullWidth: true, browse: 'directory' },
+  { key: 'imageName', label: 'Docker Image Name', placeholder: 'myapp', required: true },
+  { key: 'dockerfilePath', label: 'Dockerfile Path', placeholder: './Dockerfile', browse: 'file' },
+  { key: 'composePath', label: 'Docker Compose File', placeholder: './deploy/docker-compose.yml', browse: 'file' },
+  { key: 'caddyfilePath', label: 'Caddyfile Path', placeholder: './deploy/Caddyfile', browse: 'file' },
+  { key: 'remoteHost', label: 'Remote Host (IP)', placeholder: '123.45.67.89', required: true },
+  { key: 'remoteUser', label: 'Remote User', placeholder: 'root' },
+  { key: 'sshKeyPath', label: 'SSH Key Path', placeholder: '~/.ssh/id_rsa', browse: 'file' },
+  { key: 'remotePath', label: 'Remote Deploy Path', placeholder: '~/app' },
+  { key: 'domain', label: 'Domain', placeholder: 'example.com' },
+  { key: 'preBuildScript', label: 'Pre-build Script (optional)', placeholder: './scripts/prebuild.sh', browse: 'file' },
+];
 
 export function ProjectModal({ project, onClose }: Props) {
   const [form, setForm] = useState(project ? { ...project } : { ...defaultValues });
@@ -49,58 +78,54 @@ export function ProjectModal({ project, onClose }: Props) {
     }
   };
 
-  const fields: { key: string; label: string; placeholder: string; required?: boolean }[] = [
-    { key: 'name', label: 'Project Name', placeholder: 'My App', required: true },
-    { key: 'localRoot', label: 'Local Project Root', placeholder: '/home/user/myproject', required: true },
-    { key: 'imageName', label: 'Docker Image Name', placeholder: 'myapp', required: true },
-    { key: 'dockerfilePath', label: 'Dockerfile Path', placeholder: './Dockerfile' },
-    { key: 'composePath', label: 'Docker Compose File', placeholder: './deploy/docker-compose.yml' },
-    { key: 'caddyfilePath', label: 'Caddyfile Path', placeholder: './deploy/Caddyfile' },
-    { key: 'remoteHost', label: 'Remote Host (IP)', placeholder: '123.45.67.89', required: true },
-    { key: 'remoteUser', label: 'Remote User', placeholder: 'root' },
-    { key: 'sshKeyPath', label: 'SSH Key Path', placeholder: '~/.ssh/id_rsa' },
-    { key: 'remotePath', label: 'Remote Deploy Path', placeholder: '~/app' },
-    { key: 'domain', label: 'Domain', placeholder: 'example.com' },
-    { key: 'preBuildScript', label: 'Pre-build Script (optional)', placeholder: './scripts/prebuild.sh' },
-  ];
-
   return (
-    <div className="modal d-block" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <div className="modal-dialog modal-lg" onClick={e => e.stopPropagation()}>
-        <div className="modal-content bg-dark text-light border-secondary">
-          <div className="modal-header border-secondary">
-            <h5 className="modal-title">
-              {isEdit ? '✏️ Edit Project' : '🦞 New Project'}
-            </h5>
-            <button type="button" className="btn-close btn-close-white" onClick={onClose} />
-          </div>
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              <div className="row g-3">
-                {fields.map(f => (
-                  <div key={f.key} className={f.key === 'name' || f.key === 'localRoot' ? 'col-12' : 'col-md-6'}>
-                    <label className="form-label small text-secondary">{f.label}</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm bg-black text-light border-secondary"
-                      placeholder={f.placeholder}
-                      value={(form as any)[f.key] || ''}
-                      onChange={e => handleChange(f.key, e.target.value)}
-                      required={f.required}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="modal-footer border-secondary">
-              <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn btn-sm btn-accent" disabled={saving}>
-                {saving ? 'Saving...' : (isEdit ? 'Save Changes' : 'Create Project')}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        {isEdit ? '✏️ Edit Project' : '🦞 New Project'}
+      </DialogTitle>
+      <form onSubmit={handleSubmit}>
+        <DialogContent dividers sx={{ maxHeight: '60vh' }}>
+          <Grid container spacing={2}>
+            {fields.map(f => (
+              <Grid key={f.key} size={{ xs: 12, md: f.fullWidth ? 12 : 6 }}>
+                {f.browse ? (
+                  <BrowseField
+                    label={f.label}
+                    placeholder={f.placeholder}
+                    value={(form as any)[f.key] || ''}
+                    onChange={val => handleChange(f.key, val)}
+                    required={f.required}
+                    browseType={f.browse}
+                  />
+                ) : (
+                  <TextField
+                    label={f.label}
+                    placeholder={f.placeholder}
+                    value={(form as any)[f.key] || ''}
+                    onChange={e => handleChange(f.key, e.target.value)}
+                    required={f.required}
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose} color="inherit">Cancel</Button>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}
+          >
+            {saving ? 'Saving...' : (isEdit ? 'Save Changes' : 'Create Project')}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
 }

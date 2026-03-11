@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  AppBar, Toolbar, Typography, Button, Box, Container, Grid,
+} from '@mui/material';
 import { Project } from '../types';
 import { fetchProjects, triggerDeploy, deleteProject, connectWebSocket } from '../api';
 import { ProjectCard } from './ProjectCard';
@@ -31,7 +34,7 @@ export function App() {
         setDeployingId(msg.projectId);
       } else if (msg.type === 'deploy-end') {
         setDeployingId(null);
-        loadProjects(); // refresh to get updated commit/timestamp
+        loadProjects();
       }
     });
     wsRef.current = ws;
@@ -73,30 +76,32 @@ export function App() {
   };
 
   return (
-    <div className="d-flex flex-column min-vh-100">
-      {/* Navbar */}
-      <nav className="navbar navbar-dark px-3 py-2">
-        <span className="navbar-brand mb-0 h1 d-flex align-items-center gap-2">
-          <span style={{ fontSize: '1.5rem' }}>🦞</span>
-          <span>Servestacean</span>
-        </span>
-        <button className="btn btn-accent btn-sm" onClick={handleAdd}>
-          + Add Project
-        </button>
-      </nav>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <AppBar position="static" sx={{ borderBottom: '2px solid', borderColor: 'primary.main', bgcolor: '#1e1e1e' }} elevation={0}>
+        <Toolbar sx={{ justifyContent: 'space-between' }}>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}>
+            <span>🦞</span>
+            <span>Servestacean</span>
+          </Typography>
+          <Button variant="contained" color="primary" size="small" onClick={handleAdd}>
+            + Add Project
+          </Button>
+        </Toolbar>
+      </AppBar>
 
-      {/* Main content */}
-      <div className="container-fluid p-3 flex-grow-1">
+      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         {projects.length === 0 ? (
-          <div className="text-center text-secondary mt-5">
-            <div style={{ fontSize: '4rem' }}>🦞</div>
-            <h4 className="mt-3">No projects yet</h4>
-            <p>Click "Add Project" to set up your first deployment.</p>
-          </div>
+          <Box sx={{ textAlign: 'center', mt: 8, color: 'text.secondary' }}>
+            <Box sx={{ fontSize: '4rem' }}>🦞</Box>
+            <Typography variant="h5" sx={{ mt: 2 }}>No projects yet</Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Click "Add Project" to set up your first deployment.
+            </Typography>
+          </Box>
         ) : (
-          <div className="row g-3">
+          <Grid container spacing={3}>
             {projects.map(p => (
-              <div key={p.id} className="col-12 col-md-6 col-xl-4">
+              <Grid key={p.id} size={{ xs: 12, md: 6, xl: 4 }}>
                 <ProjectCard
                   project={p}
                   deploying={deployingId === p.id}
@@ -104,12 +109,11 @@ export function App() {
                   onEdit={() => handleEdit(p)}
                   onDelete={() => handleDelete(p.id)}
                 />
-              </div>
+              </Grid>
             ))}
-          </div>
+          </Grid>
         )}
 
-        {/* Deploy Log */}
         {showLog && (
           <DeployLog
             log={logLines}
@@ -117,15 +121,14 @@ export function App() {
             onClose={() => setShowLog(false)}
           />
         )}
-      </div>
+      </Box>
 
-      {/* Add/Edit Modal */}
       {showModal && (
         <ProjectModal
           project={editProject}
           onClose={handleModalClose}
         />
       )}
-    </div>
+    </Box>
   );
 }

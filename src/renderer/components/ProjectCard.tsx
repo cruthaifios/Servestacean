@@ -1,4 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import {
+  Card, CardContent, Typography, Button, IconButton, Box, Chip,
+  Menu, MenuItem, Divider, CircularProgress,
+} from '@mui/material';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import { Project } from '../types';
 
 interface Props {
@@ -21,68 +29,90 @@ function timeAgo(dateStr: string): string {
 }
 
 export function ProjectCard({ project, deploying, onDeploy, onEdit, onDelete }: Props) {
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+
+  const handleMenuOpen = (e: React.MouseEvent<HTMLElement>) => {
+    setMenuAnchor(e.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+  };
+
+  const handleEdit = () => {
+    handleMenuClose();
+    onEdit();
+  };
+
+  const handleDelete = () => {
+    handleMenuClose();
+    onDelete();
+  };
+
   return (
-    <div className="card bg-dark text-light h-100">
-      <div className="card-body d-flex flex-column">
-        <div className="d-flex justify-content-between align-items-start mb-2">
-          <h5 className="card-title mb-0">{project.name}</h5>
-          <div className="dropdown">
-            <button
-              className="btn btn-sm btn-outline-secondary border-0"
-              data-bs-toggle="dropdown"
-              onClick={(e) => {
-                // Simple dropdown toggle without Bootstrap JS
-                const menu = e.currentTarget.nextElementSibling;
-                if (menu) menu.classList.toggle('show');
-              }}
-            >
-              ⋮
-            </button>
-            <ul className="dropdown-menu dropdown-menu-dark dropdown-menu-end">
-              <li><button className="dropdown-item" onClick={onEdit}>✏️ Edit</button></li>
-              <li><hr className="dropdown-divider" /></li>
-              <li><button className="dropdown-item text-danger" onClick={onDelete}>🗑️ Delete</button></li>
-            </ul>
-          </div>
-        </div>
+    <Card sx={{ height: '100%', bgcolor: 'background.paper' }}>
+      <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%', p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+            {project.name}
+          </Typography>
+          <IconButton size="small" onClick={handleMenuOpen} sx={{ ml: 1 }}>
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+          <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleMenuClose}>
+            <MenuItem onClick={handleEdit} sx={{ gap: 1 }}>
+              <EditIcon fontSize="small" /> Edit
+            </MenuItem>
+            <Divider />
+            <MenuItem onClick={handleDelete} sx={{ color: 'error.main', gap: 1 }}>
+              <DeleteIcon fontSize="small" /> Delete
+            </MenuItem>
+          </Menu>
+        </Box>
 
-        <div className="small text-secondary mb-1">
-          <span className="me-3">🖥️ {project.remoteUser}@{project.remoteHost}</span>
-        </div>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+          🖥️ {project.remoteUser}@{project.remoteHost}
+        </Typography>
         {project.domain && (
-          <div className="small text-secondary mb-1">🌐 {project.domain}</div>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+            🌐 {project.domain}
+          </Typography>
         )}
-        <div className="small text-secondary mb-3">📁 {project.imageName}</div>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          📁 {project.imageName}
+        </Typography>
 
-        <div className="mt-auto d-flex justify-content-between align-items-center">
-          <div>
+        <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
             {project.lastDeployedAt ? (
-              <span className="small text-secondary">
-                <span className="commit-badge badge bg-secondary me-1">
-                  {project.lastDeployedCommit || '???'}
-                </span>
-                {timeAgo(project.lastDeployedAt)}
-              </span>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Chip
+                  label={project.lastDeployedCommit || '???'}
+                  size="small"
+                  sx={{ fontFamily: 'monospace', fontSize: '0.75rem', height: 20 }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  {timeAgo(project.lastDeployedAt)}
+                </Typography>
+              </Box>
             ) : (
-              <span className="small text-secondary fst-italic">Never deployed</span>
+              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                Never deployed
+              </Typography>
             )}
-          </div>
-          <button
-            className="btn btn-accent btn-sm"
+          </Box>
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
             onClick={onDeploy}
             disabled={deploying}
+            startIcon={deploying ? <CircularProgress size={14} color="inherit" /> : <RocketLaunchIcon fontSize="small" />}
           >
-            {deploying ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-1" role="status" />
-                Deploying...
-              </>
-            ) : (
-              '🚀 Deploy'
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+            {deploying ? 'Deploying...' : 'Deploy'}
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
   );
 }

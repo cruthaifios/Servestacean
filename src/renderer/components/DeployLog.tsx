@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+import { Box, Typography, Button, CircularProgress } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface Props {
   log: string;
@@ -16,23 +18,45 @@ export function DeployLog({ log, deploying, onClose }: Props) {
   }, [log]);
 
   return (
-    <div className="mt-3">
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <h6 className="mb-0 text-light">
+    <Box sx={{ mt: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {deploying ? (
             <>
-              <span className="spinner-border spinner-border-sm me-2" role="status" />
+              <CircularProgress size={14} color="primary" />
               Deploy in progress...
             </>
           ) : (
             '📋 Deploy Log'
           )}
-        </h6>
-        <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>✕ Close</button>
-      </div>
-      <div className="deploy-log" ref={logRef}>
+        </Typography>
+        <Button
+          size="small"
+          color="inherit"
+          startIcon={<CloseIcon fontSize="small" />}
+          onClick={onClose}
+        >
+          Close
+        </Button>
+      </Box>
+      <Box
+        ref={logRef}
+        sx={{
+          bgcolor: '#0d0d0d',
+          color: '#c8c8c8',
+          fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+          fontSize: '0.85rem',
+          p: 2,
+          maxHeight: 400,
+          overflowY: 'auto',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
+          border: '1px solid #333',
+          borderRadius: 1,
+        }}
+      >
         {log || 'Waiting for output...'}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

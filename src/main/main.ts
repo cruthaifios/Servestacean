@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import { startServer } from './server';
 
@@ -17,6 +17,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
     title: '🦞 Servestacean',
   });
@@ -24,6 +25,14 @@ function createWindow() {
   mainWindow.loadURL(`http://localhost:${SERVER_PORT}`);
   mainWindow.on('closed', () => { mainWindow = null; });
 }
+
+ipcMain.handle('dialog:browse', async (_event, options: { type: 'file' | 'directory'; defaultPath?: string }) => {
+  const result = await dialog.showOpenDialog({
+    properties: options.type === 'directory' ? ['openDirectory'] : ['openFile'],
+    defaultPath: options.defaultPath,
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
 
 app.whenReady().then(async () => {
   await startServer(SERVER_PORT);
