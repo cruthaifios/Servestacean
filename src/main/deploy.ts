@@ -45,10 +45,14 @@ function getGitCommit(cwd: string): Promise<string | null> {
   });
 }
 
+const REGISTRY_PORT = 5000;
+const REGISTRY_CONTAINER = 'servestacean-registry';
+
 export async function deployProject(project: ProjectConfig, broadcast: BroadcastFn): Promise<boolean> {
   const { localRoot, dockerfilePath, composePath, caddyfilePath, imageName, remoteUser, remoteHost, sshKeyPath, remotePath, preBuildScript } = project;
-  const tmpTar = `/tmp/${imageName}.tar.gz`;
+  const registryImage = `localhost:${REGISTRY_PORT}/${imageName}:latest`;
   const sshOpts = sshKeyPath ? `-i ${sshKeyPath} -o StrictHostKeyChecking=no` : '-o StrictHostKeyChecking=no';
+  const sshTunnelOpts = `${sshOpts} -R ${REGISTRY_PORT}:localhost:${REGISTRY_PORT}`;
   const remote = `${remoteUser}@${remoteHost}`;
 
   try {
@@ -77,20 +81,40 @@ export async function deployProject(project: ProjectConfig, broadcast: Broadcast
       return false;
     }
 
-    // Step 3: Save & compress image
-    broadcast({ type: 'log', data: '\n── Step 3: Saving & compressing image ──\n' });
-    const saveCode = await runCommand('bash', ['-c', `docker save ${imageName}:latest | gzip > ${tmpTar}`], localRoot, broadcast);
-    if (saveCode !== 0) {
-      broadcast({ type: 'log', data: `\n❌ Docker save failed (exit ${saveCode})\n` });
+    // Step 3: Ensure local registry is running
+    broadcast({ type: 'log', data: '\n── Step 3: Starting local registry ──\n' });
+    const registryCmd = `docker start ${REGISTRY_CONTAINER} 2>/dev/null || docker run -d -p ${REGISTRY_PORT}:5000 --name ${REGISTRY_CONTAINER} --restart=unless-stopped registry:2`;
+    const registryCode = await runCommand('bash', ['-c', registryCmd], localRoot, broadcast);
+    if (registryCode !== 0) {
+      broadcast({ type: 'log', data: `\n❌ Failed to start local registry (exit ${registryCode})\n` });
+      broadcast({ type: 'deploy-end', projectId: project.id, success: false });
+      return false;
+    }
+    
+    // Wait for registry to be ready (it needs a moment to initialize)
+    broadcast({ type: 'log', data: 'Waiting for registry to be ready...\n' });
+    await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay for registry to fully initialize
+
+    // Step 4: Tag & push image to local registry
+    broadcast({ type: 'log', data: '\n── Step 4: Pushing image to local registry ──\n' });
+    const tagCode = await runCommand('docker', ['tag', `${imageName}:latest`, registryImage], localRoot, broadcast);
+    if (tagCode !== 0) {
+      broadcast({ type: 'log', data: `\n❌ Docker tag failed (exit ${tagCode})\n` });
+      broadcast({ type: 'deploy-end', projectId: project.id, success: false });
+      return false;
+    }
+    const pushCode = await runCommand('docker', ['push', registryImage], localRoot, broadcast);
+    if (pushCode !== 0) {
+      broadcast({ type: 'log', data: `\n❌ Docker push failed (exit ${pushCode})\n` });
       broadcast({ type: 'deploy-end', projectId: project.id, success: false });
       return false;
     }
 
-    // Step 4: Ensure remote directory & SCP files
-    broadcast({ type: 'log', data: '\n── Step 4: Transferring files to server ──\n' });
+    // Step 5: Transfer compose & config files to remote
+    broadcast({ type: 'log', data: '\n── Step 5: Transferring files to server ──\n' });
     await runCommand('ssh', [sshOpts, remote, `mkdir -p ${remotePath}`], localRoot, broadcast);
 
-    const filesToCopy = [tmpTar];
+    const filesToCopy: string[] = [];
     if (composePath) {
       const absCompose = path.isAbsolute(composePath) ? composePath : path.join(localRoot, composePath);
       filesToCopy.push(absCompose);
@@ -100,25 +124,30 @@ export async function deployProject(project: ProjectConfig, broadcast: Broadcast
       filesToCopy.push(absCaddy);
     }
 
-    const scpCode = await runCommand('scp', [sshOpts, ...filesToCopy, `${remote}:${remotePath}/`], localRoot, broadcast);
-    if (scpCode !== 0) {
-      broadcast({ type: 'log', data: `\n❌ SCP failed (exit ${scpCode})\n` });
-      broadcast({ type: 'deploy-end', projectId: project.id, success: false });
-      return false;
+    if (filesToCopy.length > 0) {
+      const scpCode = await runCommand('scp', [sshOpts, ...filesToCopy, `${remote}:${remotePath}/`], localRoot, broadcast);
+      if (scpCode !== 0) {
+        broadcast({ type: 'log', data: `\n❌ SCP failed (exit ${scpCode})\n` });
+        broadcast({ type: 'deploy-end', projectId: project.id, success: false });
+        return false;
+      }
     }
 
-    // Step 5: Load image & compose up on remote
-    broadcast({ type: 'log', data: '\n── Step 5: Deploying on remote server ──\n' });
-    const tarFilename = `${imageName}.tar.gz`;
-    const remoteCmd = `cd ${remotePath} && docker load < ${tarFilename} && docker compose up -d && rm -f ${tarFilename}`;
-    const deployCode = await runCommand('ssh', [sshOpts, remote, `"${remoteCmd}"`], localRoot, broadcast);
+    // Step 6: Pull image & compose up on remote (via SSH reverse tunnel to local registry)
+    broadcast({ type: 'log', data: '\n── Step 6: Deploying on remote server ──\n' });
+    const remoteCmd = [
+      `docker pull ${registryImage}`,
+      `docker tag ${registryImage} ${imageName}:latest`,
+      `cd ${remotePath} && docker compose up -d`,
+    ].join(' && ');
+    const deployCode = await runCommand('ssh', [sshTunnelOpts, remote, `"${remoteCmd}"`], localRoot, broadcast);
     if (deployCode !== 0) {
       broadcast({ type: 'log', data: `\n❌ Remote deploy failed (exit ${deployCode})\n` });
       broadcast({ type: 'deploy-end', projectId: project.id, success: false });
       return false;
     }
 
-    // Step 6: Update config with commit + timestamp
+    // Step 7: Update config with commit + timestamp
     const commit = await getGitCommit(localRoot);
     const config = loadConfig();
     const proj = config.projects.find(p => p.id === project.id);
@@ -127,10 +156,6 @@ export async function deployProject(project: ProjectConfig, broadcast: Broadcast
       proj.lastDeployedCommit = commit;
       saveConfig(config);
     }
-
-    // Step 7: Clean up temp tar
-    broadcast({ type: 'log', data: '\n── Cleaning up ──\n' });
-    await runCommand('rm', ['-f', tmpTar], localRoot, broadcast);
 
     broadcast({ type: 'log', data: `\n✅ ${project.name} deployed successfully!\n` });
     broadcast({ type: 'deploy-end', projectId: project.id, success: true, commit, timestamp: new Date().toISOString() });
